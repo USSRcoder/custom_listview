@@ -194,24 +194,24 @@ HWND CreateListView(HINSTANCE hInstance, HWND hwndParent)
         TRUE);
 
     //set the image lists
-    //himlSmall = ImageList_Create(16, 16, ILC_COLORDDB | ILC_MASK, 1, 0);
+    himlSmall = ImageList_Create(16, 16, ILC_COLORDDB | ILC_MASK, 1, 0);
     //himlLarge = ImageList_Create(32, 32, ILC_COLORDDB | ILC_MASK, 1, 0);
 
-    //if (himlSmall && himlLarge)
-    //{
-    //    HICON hIcon;
+    if (himlSmall)
+    {
+        HICON hIcon;
 
-    //    //set up the small image list
-    //    hIcon = (HICON)LoadImage(hInst, MAKEINTRESOURCE(IDI_DISK), IMAGE_ICON, 16, 16, LR_DEFAULTCOLOR);
-    //    ImageList_AddIcon(himlSmall, hIcon);
+        //set up the small image list
+        hIcon = (HICON)LoadImage(hInst, MAKEINTRESOURCE(IDI_DISK), IMAGE_ICON, 16, 16, LR_DEFAULTCOLOR);
+        ImageList_AddIcon(himlSmall, hIcon);
 
     //    //set up the large image list
     //    hIcon = LoadIcon(g_hInst, MAKEINTRESOURCE(IDI_DISK));
     //    ImageList_AddIcon(himlLarge, hIcon);
 
-    //    ListView_SetImageList(hwndListView, himlSmall, LVSIL_SMALL);
+        ListView_SetImageList(hwndListView, himlSmall, LVSIL_SMALL);
     //    ListView_SetImageList(hwndListView, himlLarge, LVSIL_NORMAL);
-    //}
+    }
 
     return hwndListView;
 }

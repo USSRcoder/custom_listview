@@ -13,6 +13,7 @@
 #define IDC_LISTVIEW                    109
 #define IDR_MAINFRAME                   128
 #define IDC_STATIC                      -1
+#define IDI_DISK                        108
 
 // Next default values for new objects
 // 
