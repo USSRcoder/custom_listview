@@ -1,13 +1,135 @@
+/*
+ * Listview control - Only "Report" mode view is support;
+ *
+ * Copyright 1998, 1999 Eric Kohl
+ * Copyright 1999 Luc Tourangeau
+ * Copyright 2000 Jason Mawdsley
+ * Copyright 2001 CodeWeavers Inc.
+ * Copyright 2002 Dimitrie O. Paun
+ * Copyright 2009-2015 Nikolay Sivov
+ * Copyright 2009 Owen Rudge for CodeWeavers
+ * Copyright 2012-2013 Daniel Jelinski
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
+ *
+ * TODO:
+ *
+ * Default Message Processing
+ *   -- WM_CREATE: create the icon and small icon image lists at this point only if
+ *      the LVS_SHAREIMAGELISTS style is not specified.
+ *   -- WM_WINDOWPOSCHANGED: arrange the list items if the current view is icon
+ *      or small icon and the LVS_AUTOARRANGE style is specified.
+ *   -- WM_TIMER
+ *   -- WM_WININICHANGE
+ *
+ * Features
+ *   -- Hot item handling, mouse hovering
+ *   -- Workareas support
+ *   -- Tilemode support
+ *   -- Groups support
+ *
+ * Bugs
+ *   -- Expand large item in ICON mode when the cursor is flying over the icon or text.
+ *   -- Support CustomDraw options for _WIN32_IE >= 0x560 (see NMLVCUSTOMDRAW docs).
+ *   -- LVA_SNAPTOGRID not implemented
+ *   -- LISTVIEW_ApproximateViewRect partially implemented
+ *   -- LISTVIEW_StyleChanged doesn't handle some changes too well
+ *
+ * Speedups
+ *   -- LISTVIEW_GetNextItem needs to be rewritten. It is currently
+ *      linear in the number of items in the list, and this is
+ *      unacceptable for large lists.
+ *   -- if list is sorted by item text LISTVIEW_InsertItemT could use
+ *      binary search to calculate item index (e.g. DPA_Search()).
+ *      This requires sorted state to be reliably tracked in item modifiers.
+ *   -- we should keep an ordered array of coordinates in iconic mode.
+ *      This would allow framing items (iterator_frameditems),
+ *      and finding the nearest item (LVFI_NEARESTXY) a lot more efficiently.
+ *
+ * Flags
+ *   -- LVIF_COLUMNS
+ *   -- LVIF_GROUPID
+ *
+ * States
+ *   -- LVIS_ACTIVATING (not currently supported by comctl32.dll version 6.0)
+ *   -- LVIS_DROPHILITED
+ *
+ * Styles
+ *   -- LVS_NOLABELWRAP
+ *   -- LVS_NOSCROLL (see Q137520)
+ *   -- LVS_ALIGNTOP
+ *
+ * Extended Styles
+ *   -- LVS_EX_BORDERSELECT
+ *   -- LVS_EX_FLATSB
+ *   -- LVS_EX_INFOTIP
+ *   -- LVS_EX_LABELTIP
+ *   -- LVS_EX_MULTIWORKAREAS
+ *   -- LVS_EX_REGIONAL
+ *   -- LVS_EX_SIMPLESELECT
+ *   -- LVS_EX_TWOCLICKACTIVATE
+ *   -- LVS_EX_UNDERLINECOLD
+ *   -- LVS_EX_UNDERLINEHOT
+ *   
+ * Notifications:
+ *   -- LVN_BEGINSCROLL, LVN_ENDSCROLL
+ *   -- LVN_GETINFOTIP
+ *   -- LVN_HOTTRACK
+ *   -- LVN_SETDISPINFO
+ *
+ * Messages:
+ *   -- LVM_ENABLEGROUPVIEW
+ *   -- LVM_GETBKIMAGE
+ *   -- LVM_GETGROUPINFO, LVM_SETGROUPINFO
+ *   -- LVM_GETGROUPMETRICS, LVM_SETGROUPMETRICS
+ *   -- LVM_GETINSERTMARK, LVM_SETINSERTMARK
+ *   -- LVM_GETINSERTMARKCOLOR, LVM_SETINSERTMARKCOLOR
+ *   -- LVM_GETINSERTMARKRECT
+ *   -- LVM_GETNUMBEROFWORKAREAS
+ *   -- LVM_GETOUTLINECOLOR, LVM_SETOUTLINECOLOR
+ *   -- LVM_GETISEARCHSTRINGW, LVM_GETISEARCHSTRINGA
+ *   -- LVM_GETTILEINFO, LVM_SETTILEINFO
+ *   -- LVM_GETTILEVIEWINFO, LVM_SETTILEVIEWINFO
+ *   -- LVM_GETWORKAREAS, LVM_SETWORKAREAS
+ *   -- LVM_HASGROUP, LVM_INSERTGROUP, LVM_REMOVEGROUP, LVM_REMOVEALLGROUPS
+ *   -- LVM_INSERTGROUPSORTED
+ *   -- LVM_INSERTMARKHITTEST
+ *   -- LVM_ISGROUPVIEWENABLED
+ *   -- LVM_MOVEGROUP
+ *   -- LVM_MOVEITEMTOGROUP
+ *   -- LVM_SETINFOTIP
+ *   -- LVM_SETTILEWIDTH
+ *   -- LVM_SORTGROUPS
+ *
+ * Macros:
+ *   -- ListView_GetHoverTime, ListView_SetHoverTime
+ *   -- ListView_GetISearchString
+ *   -- ListView_GetNumberOfWorkAreas
+ *   -- ListView_GetWorkAreas, ListView_SetWorkAreas
+ *
+ * Functions:
+ *   -- LVGroupComparE
+ */
+
 #define _CRT_SECURE_NO_WARNINGS
 #define __WINESRC__
 
 #include <windows.h>
-#include "winnt.h"
-#include "dpa_dsa.h"
 #include "uxtheme.h"
 #include "vsstyle.h"
 #include <commctrl.h>
-#include <Olectl.h>
 #include <stdlib.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -18,8 +140,6 @@
 #define LPLVFINDINFOW LPFINDINFOW
 #define WC_LISTVIEWA2            "MySysListView32"
 #define WC_LISTVIEWW2            L"MySysListView32"
-
-#define wcsnicmp _wcsnicmp
 
 #ifndef ARRAY_SIZE
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
@@ -115,6 +235,7 @@ COMCTL32_CreateToolTip(HWND hwndOwner)
  *     none
  */
 
+VOID COMCTL32_RefreshSysColors(void);
 typedef struct
 {
 	COLORREF clrBtnHighlight;       /* COLOR_BTNHIGHLIGHT                  */
@@ -135,8 +256,7 @@ typedef struct
 	COLORREF clrInfoBk;             /* COLOR_INFOBK                        */
 	COLORREF clrInfoText;           /* COLOR_INFOTEXT                      */
 } COMCTL32_SysColor;
-
-COMCTL32_SysColor  comctl32_color;
+COMCTL32_SysColor comctl32_color;
 
 VOID
 COMCTL32_RefreshSysColors(void)
@@ -160,46 +280,6 @@ COMCTL32_RefreshSysColors(void)
 	comctl32_color.clrInfoText = GetSysColor(COLOR_INFOTEXT);
 }
 
-/***********************************************************************
- * COMCTL32_IsReflectedMessage [internal]
- *
- * Some parents reflect notify messages - for some messages sent by the child,
- * they send it back with the message code increased by OCM__BASE (0x2000).
- * This allows better subclassing of controls. We don't need to handle such
- * messages but we don't want to print ERRs for them, so this helper function
- * identifies them.
- *
- * Some of the codes are in the CCM_FIRST..CCM_LAST range, but there is no
- * collision with defined CCM_ codes.
- */
-BOOL COMCTL32_IsReflectedMessage(UINT uMsg)
-{
-	switch (uMsg)
-	{
-		case OCM__BASE + WM_COMMAND:
-		case OCM__BASE + WM_CTLCOLORBTN:
-		case OCM__BASE + WM_CTLCOLOREDIT:
-		case OCM__BASE + WM_CTLCOLORDLG:
-		case OCM__BASE + WM_CTLCOLORLISTBOX:
-		case OCM__BASE + WM_CTLCOLORMSGBOX:
-		case OCM__BASE + WM_CTLCOLORSCROLLBAR:
-		case OCM__BASE + WM_CTLCOLORSTATIC:
-		case OCM__BASE + WM_DRAWITEM:
-		case OCM__BASE + WM_MEASUREITEM:
-		case OCM__BASE + WM_DELETEITEM:
-		case OCM__BASE + WM_VKEYTOITEM:
-		case OCM__BASE + WM_CHARTOITEM:
-		case OCM__BASE + WM_COMPAREITEM:
-		case OCM__BASE + WM_HSCROLL:
-		case OCM__BASE + WM_VSCROLL:
-		case OCM__BASE + WM_PARENTNOTIFY:
-		case OCM__BASE + WM_NOTIFY:
-			return TRUE;
-		default:
-			return FALSE;
-	}
-}
-
 /**************************************************************************
  * Str_SetPtrWtoA [internal]
  *
@@ -211,8 +291,7 @@ BOOL COMCTL32_IsReflectedMessage(UINT uMsg)
  */
 BOOL Str_SetPtrWtoA(char** dst, const WCHAR* src)
 {
-	if (src)
-	{
+	if (src) {
 		INT len = WideCharToMultiByte(CP_ACP, 0, src, -1, NULL, 0, NULL, FALSE);
 		LPSTR ptr = ReAlloc(*dst, len * sizeof(**dst));
 
@@ -221,8 +300,7 @@ BOOL Str_SetPtrWtoA(char** dst, const WCHAR* src)
 		WideCharToMultiByte(CP_ACP, 0, src, -1, ptr, len, NULL, FALSE);
 		*dst = ptr;
 	}
-	else
-	{
+	else {
 		Free(*dst);
 		*dst = NULL;
 	}
@@ -2214,10 +2292,6 @@ static void LISTVIEW_GetItemMetrics(const LISTVIEW_INFO* infoPtr, const LVITEMW*
 			else
 				SelectBox.right = min(Label.left + MAX_EMPTYTEXT_SELECT_WIDTH, Label.right);
 		}
-		else
-		{
-			UnionRect(&SelectBox, &Icon, &Label);
-		}
 		if (lprcSelectBox) *lprcSelectBox = SelectBox;
 	}
 
@@ -3136,30 +3210,6 @@ static void LISTVIEW_SetGroupSelection(LISTVIEW_INFO* infoPtr, INT nItem)
 			sel.upper = max(infoPtr->nSelectionMark, nItem) + 1;
 			ranges_add(selection, sel);
 		}
-	}
-	else
-	{
-		RECT rcItem, rcSel, rcSelMark;
-		POINT ptItem;
-
-		rcItem.left = LVIR_BOUNDS;
-		if (!LISTVIEW_GetItemRect(infoPtr, nItem, &rcItem)) {
-			ranges_destroy(selection);
-			return;
-		}
-		rcSelMark.left = LVIR_BOUNDS;
-		if (!LISTVIEW_GetItemRect(infoPtr, infoPtr->nSelectionMark, &rcSelMark)) {
-			ranges_destroy(selection);
-			return;
-		}
-		UnionRect(&rcSel, &rcItem, &rcSelMark);
-		iterator_frameditems(&i, infoPtr, &rcSel);
-		while (iterator_next(&i))
-		{
-			LISTVIEW_GetItemPosition(infoPtr, i.nItem, &ptItem);
-			if (PtInRect(&rcSel, ptItem)) ranges_additem(selection, i.nItem);
-		}
-		iterator_destroy(&i);
 	}
 
 	/* Disable per item notifications on LVS_OWNERDATA style */

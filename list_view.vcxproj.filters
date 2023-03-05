@@ -35,6 +35,9 @@
     <ClCompile Include="listview.c">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
+    <ClCompile Include="treeview.c">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="list_view.rc">

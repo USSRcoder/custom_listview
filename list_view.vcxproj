@@ -147,6 +147,7 @@
   <ItemGroup>
     <ClCompile Include="listview.c" />
     <ClCompile Include="list_view.cpp" />
+    <ClCompile Include="treeview.c" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="list_view.rc" />
