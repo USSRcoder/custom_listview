@@ -522,7 +522,7 @@ LRESULT ListViewNotify(HWND hWnd, LPARAM lParam)
                             rcpart = rc_label;
                             rcpart.left = part1_x;
                             DrawText(lplvcd->nmcd.hdc, lvi.pszText + part1, part2 - part1, &rcpart, DT_LEFT | DT_VCENTER | DT_NOPREFIX | DT_EDITCONTROL | DT_SINGLELINE);
-                            SetTextColor(lplvcd->nmcd.hdc, isselected ? COLOR_HIGHLIGHTTEXT : GetSysColor(COLOR_WINDOWTEXT));
+                            SetTextColor(lplvcd->nmcd.hdc, isselected ? GetSysColor(COLOR_HIGHLIGHTTEXT) : GetSysColor(COLOR_WINDOWTEXT));
                             rcpart = rc_label;
                             rcpart.left = part2_x;
                             DrawText(lplvcd->nmcd.hdc, lvi.pszText + part2, textlen - part2, &rcpart, DT_LEFT | DT_VCENTER | DT_NOPREFIX | DT_EDITCONTROL | DT_SINGLELINE | DT_WORD_ELLIPSIS | DT_END_ELLIPSIS);
